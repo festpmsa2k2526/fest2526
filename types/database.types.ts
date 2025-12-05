@@ -9,6 +9,20 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      grade_settings: {
+        Row: {
+          id: string
+          grade_type: 'A' | 'B' | 'C'
+          first_place: number
+          second_place: number
+          third_place: number
+        }
+        Update: {
+          first_place?: number
+          second_place?: number
+          third_place?: number
+        }
+      }
       profiles: {
         Row: {
           id: string
@@ -119,7 +133,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          student_id: string | null
+          student_id?: string | null
           event_id: string
           team_id: string
           status?: 'registered' | 'completed' | 'disqualified' | 'winner'
@@ -129,7 +143,7 @@ export interface Database {
         }
         Update: {
             id?: string
-            student_id?: string
+            student_id?: string | null
             event_id?: string
             team_id?: string
             status?: 'registered' | 'completed' | 'disqualified' | 'winner'
