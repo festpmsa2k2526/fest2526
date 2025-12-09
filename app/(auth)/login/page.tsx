@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { Trophy, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { Trophy, AlertCircle, Loader2, ArrowLeft, Heart } from 'lucide-react';
 import Link from 'next/link';
 
 interface UserProfile {
@@ -66,10 +66,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background relative overflow-hidden">
 
       {/* Abstract Background Shapes */}
-      {/* Updated to explicit arbitrary values for v4 safety */}
       <div className="absolute top-[-10%] left-[-10%] w-160 h-160 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-120 h-120 bg-secondary rounded-full blur-3xl opacity-50 pointer-events-none" />
 
@@ -85,10 +84,10 @@ export default function LoginPage() {
         <ThemeSwitcher />
       </div>
 
-      <div className="w-full max-w-md p-4 z-10 animate-fade-in-up">
+      <div className="w-full max-w-md p-4 z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <Card className="glass-card shadow-2xl border-white/20 dark:border-white/10">
           <CardHeader className="text-center space-y-4 pb-8">
-            {/* Logo with v4 Gradient Syntax (bg-linear-to-br) */}
+            {/* Logo with v4 Gradient Syntax */}
             <div className="mx-auto w-16 h-16 bg-linear-to-br from-primary to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30 transform rotate-3 hover:rotate-6 transition-transform">
               <Trophy className="w-8 h-8 text-white" />
             </div>
@@ -127,13 +126,13 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg flex items-center gap-3">
+                <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg flex items-center gap-3 animate-in fade-in zoom-in duration-300">
                   <AlertCircle className="w-5 h-5 shrink-0" />
                   {error}
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-12 text-base font-medium shadow-lg shadow-primary/20" disabled={loading}>
+              <Button type="submit" className="w-full h-12 text-base font-medium shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Authenticating...
@@ -145,9 +144,26 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-        <p className="text-center text-xs text-muted-foreground mt-8">
-            Protected by College IT Department. Unauthorized access is prohibited.
-        </p>
+
+        {/* Footer Credit */}
+        <div className="mt-8 text-center animate-in fade-in duration-1000 delay-300">
+            <p className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1.5">
+                Made with
+                <Heart className="w-4 h-4 text-red-500 fill-red-500 animate-pulse" />
+                by
+                <a
+                    href="https://shuhaib-portfolio.vercel.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-transparent bg-clip-text bg-linear-to-r from-primary to-purple-600 hover:from-purple-600 hover:to-primary transition-all duration-300 hover:scale-105"
+                >
+                    Shuhaib
+                </a>
+            </p>
+            <p className="text-center text-xs text-muted-foreground/50 mt-2">
+                Protected by College IT Department. Unauthorized access is prohibited.
+            </p>
+        </div>
       </div>
     </div>
   );
