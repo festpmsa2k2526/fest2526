@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase"
 import { StudentFormDialog } from "@/components/admin/students/student-form-dialog"
 import { CsvUploadDialog } from "@/components/admin/students/csv-upload-dialog"
+import { LimitSettingsDialog } from "@/components/admin/students/limit-settings-dialog"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -17,7 +18,7 @@ import {
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog"
-import { Loader2, Trash2, Search, Edit2, Upload, Plus, AlertTriangle } from "lucide-react"
+import { Loader2, Trash2, Search, Edit2, Upload, Plus, AlertTriangle, Settings2 } from "lucide-react"
 
 // Types
 interface Team { id: string; name: string; slug: string; color_hex: string }
@@ -45,6 +46,7 @@ export default function AdminStudents() {
   // Modal States
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [isLimitsOpen, setIsLimitsOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
 
   // Delete State
@@ -136,6 +138,9 @@ export default function AdminStudents() {
           <p className="text-muted-foreground">Manage registered students and their details.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setIsLimitsOpen(true)} className="gap-2">
+                <Settings2 className="w-4 h-4" /> Participation Limits
+            </Button>
             <Button variant="outline" onClick={() => { setEditingStudent(null); setIsAddOpen(true); }} className="gap-2">
                 <Plus className="w-4 h-4" /> Add Student
             </Button>
@@ -143,7 +148,7 @@ export default function AdminStudents() {
                 <Upload className="w-4 h-4" /> Import CSV
             </Button>
             {students.length > 0 && (
-                <Button variant="outline" onClick={() => setIsBulkDeleteOpen(true)} className="gap-2">
+                <Button variant="destructive" onClick={() => setIsBulkDeleteOpen(true)} className="gap-2">
                     <Trash2 className="w-4 h-4" /> Delete All
                 </Button>
             )}
@@ -256,23 +261,28 @@ export default function AdminStudents() {
         onSuccess={loadData}
       />
 
+      <LimitSettingsDialog
+        open={isLimitsOpen}
+        onOpenChange={setIsLimitsOpen}
+      />
+
       {/* DELETE CONFIRMATION */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="bg-white">
+        <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Student?</AlertDialogTitle>
                 <AlertDialogDescription>This action cannot be undone. This will permanently remove the student and their event participations.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-800">Delete</AlertDialogAction>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* BULK DELETE CONFIRMATION */}
       <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
-        <AlertDialogContent className="bg-white">
+        <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="w-5 h-5" /> Danger Zone: Delete All?</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -282,7 +292,7 @@ export default function AdminStudents() {
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-800">Yes, Delete Everything</AlertDialogAction>
+                <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">Yes, Delete Everything</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
