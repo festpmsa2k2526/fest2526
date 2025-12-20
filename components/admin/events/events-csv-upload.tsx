@@ -118,7 +118,7 @@ export function EventsCsvUpload({ open, onOpenChange, onSuccess }: CsvUploadDial
         <DialogHeader>
           <DialogTitle>Import Events via CSV</DialogTitle>
           <DialogDescription>
-            <a href="/template_events.csv" download className="text-green-700 hover:underline font-medium">
+            <a href="/template_events.xlsx" download className="text-green-700 hover:underline font-medium">
               Download Template
             </a>
           </DialogDescription>

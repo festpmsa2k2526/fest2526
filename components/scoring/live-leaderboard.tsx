@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, RefreshCw } from "lucide-react"
+import { Loader2, RefreshCw, Trophy } from "lucide-react"
 
 export function LiveLeaderboard({ refreshTrigger }: { refreshTrigger: number }) {
   const [scores, setScores] = useState<any[]>([])
@@ -45,14 +45,22 @@ export function LiveLeaderboard({ refreshTrigger }: { refreshTrigger: number }) 
         }
 
         const isGeneral = (p: any) => checkSection(p, 'General')
+        const isFoundation = (p: any) => checkSection(p, 'Foundation')
         const isSenior = (p: any) => checkSection(p, 'Senior')
         const isJunior = (p: any) => checkSection(p, 'Junior')
         const isSubJunior = (p: any) => checkSection(p, 'Sub-Junior')
 
+        // Aggregation Logic
         const general = teamParts
             .filter((p: any) => isGeneral(p))
             .reduce((s:number, p:any) => s + (p.points_earned || 0), 0)
 
+        const foundation = teamParts
+            .filter((p: any) => isFoundation(p))
+            .reduce((s:number, p:any) => s + (p.points_earned || 0), 0)
+
+        // For standard sections, exclude General/Foundation to prevent double counting if overlap exists
+        // (Though usually they are mutually exclusive in DB)
         const senior = teamParts
             .filter((p: any) => isSenior(p) && !isGeneral(p))
             .reduce((s:number, p:any) => s + (p.points_earned || 0), 0)
@@ -62,7 +70,7 @@ export function LiveLeaderboard({ refreshTrigger }: { refreshTrigger: number }) 
             .reduce((s:number, p:any) => s + (p.points_earned || 0), 0)
 
         const subJunior = teamParts
-            .filter((p: any) => isSubJunior(p) && !isGeneral(p))
+            .filter((p: any) => isSubJunior(p) && !isGeneral(p) && !isFoundation(p))
             .reduce((s:number, p:any) => s + (p.points_earned || 0), 0)
 
         return {
@@ -73,7 +81,8 @@ export function LiveLeaderboard({ refreshTrigger }: { refreshTrigger: number }) 
           senior,
           junior,
           subJunior,
-          general
+          general,
+          foundation
         }
       })
 
@@ -84,56 +93,59 @@ export function LiveLeaderboard({ refreshTrigger }: { refreshTrigger: number }) 
     }
 
     calculateScores()
-  }, [refreshTrigger])
+  }, [refreshTrigger]) // Re-run when trigger changes
 
-  if (loading) return (
-    <div className="flex justify-center p-8 bg-card rounded-xl border border-border/50">
-        <Loader2 className="animate-spin text-primary" />
-    </div>
-  )
+  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
 
   return (
-    <Card className="glass-card shadow-md border-border/50 overflow-hidden">
-      <CardHeader className="py-4 border-b border-border/50 bg-muted/20">
+    <Card className="glass-card shadow-md border-border/50 h-full flex flex-col">
+      <CardHeader className="py-4 border-b border-border/50 bg-muted/20 shrink-0">
         <CardTitle className="text-lg font-heading flex items-center gap-2 text-foreground">
-          <RefreshCw className="w-4 h-4 text-primary" /> Live Standings
+          <Trophy className="w-4 h-4 text-primary" /> Live Standings
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-            <Table>
-            <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40 border-border/50">
-                <TableHead className="w-[35%] text-foreground font-semibold">Team</TableHead>
-                <TableHead className="text-center font-bold text-primary">Total</TableHead>
-                <TableHead className="text-center text-xs text-muted-foreground md:table-cell">Sen</TableHead>
-                <TableHead className="text-center text-xs text-muted-foreground md:table-cell">Jun</TableHead>
-                <TableHead className="text-center text-xs text-muted-foreground md:table-cell">Sub</TableHead>
-                <TableHead className="text-center text-xs text-muted-foreground md:table-cell">Gen</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {scores.map((team, idx) => (
-                <TableRow key={team.id} className="hover:bg-muted/20 border-border/50 transition-colors">
-                    <TableCell className="font-medium flex items-center gap-2">
-                    <div className="font-mono text-xs text-muted-foreground w-4">{idx + 1}</div>
-                    <div className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: team.color }}></div>
-                    <span className="truncate text-sm text-foreground">{team.name}</span>
-                    </TableCell>
-                    <TableCell className="text-center font-bold text-lg text-primary">
-                    {team.total}
-                    </TableCell>
-                    <TableCell className="text-center text-muted-foreground text-sm md:table-cell">{team.senior ?? 0}</TableCell>
-                    <TableCell className="text-center text-muted-foreground text-sm md:table-cell">{team.junior ?? 0}</TableCell>
-                    <TableCell className="text-center text-muted-foreground text-sm md:table-cell">{team.subJunior ?? 0}</TableCell>
-                    <TableCell className="text-center text-muted-foreground text-sm md:table-cell">
-                        {team.general ?? 0}
-                    </TableCell>
-                </TableRow>
-                ))}
-            </TableBody>
-            </Table>
-        </div>
+      <CardContent className="p-0 overflow-auto flex-1 min-h-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40 border-border/50">
+              <TableHead className="w-[30%] text-foreground font-semibold pl-4">Team</TableHead>
+              <TableHead className="text-center font-bold text-primary">Total</TableHead>
+              {/* Responsive Columns */}
+              <TableHead className="text-center text-[10px] text-muted-foreground hidden xl:table-cell">Sen</TableHead>
+              <TableHead className="text-center text-[10px] text-muted-foreground hidden xl:table-cell">Jun</TableHead>
+              <TableHead className="text-center text-[10px] text-muted-foreground hidden xl:table-cell">Sub</TableHead>
+              <TableHead className="text-center text-[10px] text-muted-foreground hidden xl:table-cell">Gen</TableHead>
+              <TableHead className="text-center text-[10px] text-muted-foreground hidden xl:table-cell">Fnd</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {scores.map((team, idx) => (
+              <TableRow key={team.id} className="hover:bg-muted/20 border-border/50 transition-colors">
+                <TableCell className="pl-4">
+                    <div className="flex items-center gap-2">
+                        <div className="font-mono text-xs text-muted-foreground w-3">{idx + 1}</div>
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: team.color }}></div>
+                            <span className="truncate text-sm font-medium text-foreground">{team.name}</span>
+                        </div>
+                    </div>
+                </TableCell>
+                <TableCell className="text-center">
+                    <span className="font-bold text-lg text-primary">{team.total}</span>
+                </TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs hidden xl:table-cell">{team.senior}</TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs hidden xl:table-cell">{team.junior}</TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs hidden xl:table-cell">{team.subJunior}</TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs hidden xl:table-cell font-medium bg-muted/30">
+                    {team.general}
+                </TableCell>
+                <TableCell className="text-center text-muted-foreground text-xs hidden xl:table-cell">
+                    {team.foundation}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   )

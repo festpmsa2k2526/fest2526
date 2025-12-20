@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Settings, BarChart3, Edit3 } from "lucide-react"
 
+// UPDATED SECTIONS to include Foundation
 const SECTIONS = [
   { id: 'SENIOR_ON', label: 'Senior On-Stage', section: 'Senior', cat: 'ON STAGE' },
   { id: 'SENIOR_OFF', label: 'Senior Off-Stage', section: 'Senior', cat: 'OFF STAGE' },
@@ -18,6 +19,9 @@ const SECTIONS = [
   { id: 'SUB_OFF', label: 'Sub-Jr Off-Stage', section: 'Sub-Junior', cat: 'OFF STAGE' },
   { id: 'GENERAL_ON', label: 'General On-Stage', section: 'General', cat: 'ON STAGE' },
   { id: 'GENERAL_OFF', label: 'General Off-Stage', section: 'General', cat: 'OFF STAGE' },
+  // ADDED FOUNDATION
+  { id: 'FOUNDATION_ON', label: 'Foundation On-Stage', section: 'Foundation', cat: 'ON STAGE' },
+  { id: 'FOUNDATION_OFF', label: 'Foundation Off-Stage', section: 'Foundation', cat: 'OFF STAGE' },
 ]
 
 export default function ScoringPage() {
@@ -33,6 +37,7 @@ export default function ScoringPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] animate-in fade-in duration-500 overflow-hidden pb-2 space-y-4">
 
+      {/* Header Section */}
       <div className="shrink-0 flex items-center justify-between">
          <div>
             <h1 className="text-2xl md:text-3xl font-heading font-bold tracking-tight text-foreground">Score Registration</h1>
@@ -71,7 +76,6 @@ export default function ScoringPage() {
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0 relative">
 
         {/* LEFT PANEL: SCORER */}
-        {/* FIX: Added 'flex-1' to ensure it takes height on mobile */}
         <div className={`flex-1 flex-col min-h-0 glass-card border border-border/50 rounded-xl overflow-hidden shadow-sm ${mobileView === 'LEADERBOARD' ? 'hidden lg:flex' : 'flex'}`}>
            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
              <div className="shrink-0 border-b border-border/50 bg-muted/30 px-2 pt-2">
@@ -83,7 +87,12 @@ export default function ScoringPage() {
                                 value={sec.id}
                                 className="rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-black data-[state=active]:text-primary data-[state=active]:bg-background/50 px-3 py-2.5 text-xs md:text-sm whitespace-nowrap text-muted-foreground transition-all hover:text-foreground"
                             >
-                                {sec.label.replace('Senior', 'Sen').replace('Junior', 'Jun').replace('Sub-Jr', 'Sub').replace('General', 'Gen')}
+                                {sec.label
+                                  .replace('Senior', 'Sen')
+                                  .replace('Junior', 'Jun')
+                                  .replace('Sub-Jr', 'Sub')
+                                  .replace('General', 'Gen')
+                                  .replace('Foundation', 'Fnd')}
                             </TabsTrigger>
                         ))}
                     </TabsList>
@@ -105,7 +114,6 @@ export default function ScoringPage() {
         </div>
 
         {/* RIGHT PANEL: LEADERBOARD */}
-        {/* FIX: Added 'flex-1' so it expands vertically when visible on mobile. On desktop lg:w-[450px] takes precedence */}
         <div className={`w-full lg:w-[450px] flex-1 lg:flex-none shrink-0 flex-col min-h-0 glass-card border border-border/50 rounded-xl overflow-hidden shadow-sm ${mobileView === 'SCORING' ? 'hidden lg:flex' : 'flex'}`}>
              <Tabs defaultValue="team" className="flex flex-col h-full">
                 <div className="shrink-0 border-b border-border/50 bg-muted/30 px-4 py-2">
@@ -115,7 +123,6 @@ export default function ScoringPage() {
                     </TabsList>
                 </div>
 
-                {/* FIX: Ensure this container has explicit height handling for internal scrolling */}
                 <div className="flex-1 bg-card/30 relative min-h-0">
                     <TabsContent value="team" className="mt-0 h-full p-0 absolute inset-0 overflow-y-auto">
                         <div className="p-2 md:p-4">
@@ -133,6 +140,7 @@ export default function ScoringPage() {
 
       </div>
 
+      {/* Settings Modal */}
       <GradeSettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
