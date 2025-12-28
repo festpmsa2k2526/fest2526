@@ -7,17 +7,67 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, CheckCircle2, Circle, Mic2, LayoutGrid, Users } from "lucide-react"
+import {
+  Loader2,
+  CheckCircle2,
+  Circle,
+  Mic2,
+  LayoutGrid,
+  Users,
+  AlertCircle,
+  UserMinus
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
-interface Team { id: string; name: string; color_hex: string }
+// --- Types & Interfaces (The Fix) ---
+
+interface Team {
+  id: string;
+  name: string;
+  color_hex: string
+}
+
+interface Event {
+  id: string;
+  name: string;
+  category: string; // 'ON STAGE' | 'OFF STAGE'
+  applicable_section: string[];
+  max_participants_per_team: number;
+}
+
+interface Participation {
+  id: string;
+  event_id: string;
+  attendance_status: string; // 'present' | 'absent' etc.
+  events?: {
+    category: string;
+  };
+}
+
+interface Student {
+  id: string;
+  name: string;
+  // Explicitly defining this property prevents the "never" error
+  participations: Participation[];
+}
+
+// Helper interface for the computed stats
+interface EventStatus extends Event {
+  registeredCount: number;
+  status: 'FULL' | 'EMPTY' | 'PARTIAL';
+}
 
 const SECTIONS = ['Senior', 'Junior', 'Sub-Junior', 'General', 'Foundation']
 
 export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | null, open: boolean, onOpenChange: (open: boolean) => void }) {
   const [loading, setLoading] = useState(true)
-  const [events, setEvents] = useState<any[]>([])
-  const [participations, setParticipations] = useState<any[]>([])
+
+  // --- The Fix Applied Here ---
+  // We explicitly type these states so TypeScript knows what they contain
+  const [events, setEvents] = useState<Event[]>([])
+  const [participations, setParticipations] = useState<Participation[]>([])
+  const [students, setStudents] = useState<Student[]>([])
+
   const [activeSection, setActiveSection] = useState("Senior")
 
   const supabase = createClient()
@@ -28,20 +78,42 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
     async function fetchData() {
       setLoading(true)
       try {
-        const { data: eventsData } = await supabase
+        // 1. Fetch Events
+        const { data: eventsData, error: eventsError } = await supabase
           .from('events')
           .select('id, name, category, applicable_section, max_participants_per_team')
           .order('name')
 
-        const { data: partData } = await supabase
-          .from('participations')
-          .select('event_id')
+        if (eventsError) throw eventsError;
+
+        // 2. Fetch Students with their Participations (for Penalty Calculation)
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select(`
+            id, name,
+            participations (
+                id, event_id, attendance_status,
+                events ( category )
+            )
+          `)
           .eq('team_id', team!.id)
 
-        if (eventsData) setEvents(eventsData)
-        if (partData) setParticipations(partData)
+        if (studentsError) throw studentsError;
+
+        if (eventsData) setEvents(eventsData as Event[])
+
+        if (studentsData) {
+            // We cast to unknown first to avoid conflicts with Supabase auto-generated types
+            const typedStudents = studentsData as unknown as Student[]
+            setStudents(typedStudents)
+
+            // Flatten participations for the registration count logic
+            const allParts = typedStudents.flatMap(s => s.participations)
+            setParticipations(allParts)
+        }
+
       } catch (err) {
-        console.error(err)
+        console.error("Error fetching team details:", err)
       } finally {
         setLoading(false)
       }
@@ -49,13 +121,51 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
     fetchData()
   }, [team, open])
 
-  // Process Data for current section grouped by Stage
+  // --- PENALTY CALCULATIONS ---
+  const penalties = useMemo(() => {
+      let compliancePenalty = 0
+      let attendancePenalty = 0
+      let nonCompliantCount = 0
+      let absentCount = 0
+
+      students.forEach(student => {
+          // Filter valid participations (not absent)
+          const validParts = student.participations.filter(p => p.attendance_status !== 'absent')
+
+          // Compliance Check
+          const hasOnStage = validParts.some(p => p.events?.category === 'ON STAGE')
+          const hasOffStage = validParts.some(p => p.events?.category === 'OFF STAGE')
+
+          if (!hasOnStage || !hasOffStage) {
+              compliancePenalty += 10
+              nonCompliantCount++
+          }
+
+          // Attendance Check (look at ALL participations, valid or not)
+          student.participations.forEach(p => {
+              if (p.attendance_status === 'absent') {
+                  attendancePenalty += 5
+                  absentCount++
+              }
+          })
+      })
+
+      return {
+          compliance: compliancePenalty,
+          attendance: attendancePenalty,
+          nonCompliantCount,
+          absentCount,
+          total: compliancePenalty + attendancePenalty
+      }
+  }, [students])
+
+  // --- SECTION STATS ---
   const stats = useMemo(() => {
     const sectionEvents = events.filter(e =>
       e.applicable_section && e.applicable_section.includes(activeSection)
     )
 
-    const processList = (list: any[]) => list.map(e => {
+    const processList = (list: Event[]): EventStatus[] => list.map(e => {
         const registeredCount = participations.filter(p => p.event_id === e.id).length
         const isFull = registeredCount >= e.max_participants_per_team
         const isEmpty = registeredCount === 0
@@ -69,7 +179,6 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
     const onStage = processList(sectionEvents.filter(e => e.category === 'ON STAGE'))
     const offStage = processList(sectionEvents.filter(e => e.category === 'OFF STAGE'))
 
-    // Calculate totals
     const totalEvents = sectionEvents.length
     const filledCount = [...onStage, ...offStage].filter(s => s.status !== 'EMPTY').length
 
@@ -80,11 +189,10 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] h-[85vh] flex flex-col p-0 overflow-hidden bg-slate-50 [&>button]:z-50">
+      <DialogContent className="max-w-[900px] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-50 [&>button]:z-50">
 
         {/* Header */}
         <DialogHeader className="p-6 pb-4 bg-white border-b shrink-0 relative overflow-hidden">
-          {/* Background decoration */}
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-10 -mr-10 -mt-10" style={{ backgroundColor: team.color_hex }} />
 
           <div className="relative z-10 flex items-start justify-between">
@@ -94,24 +202,51 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
                     <DialogTitle className="text-2xl font-bold tracking-tight text-slate-900">{team.name}</DialogTitle>
                   </div>
                   <DialogDescription className="mt-1">
-                    Registration status and capacity report.
+                    Registration and Penalty Report
                   </DialogDescription>
               </div>
 
-              {/* Mini Stats in Header */}
-              <div className="flex gap-4">
-                  <div className="text-right">
-                      <div className="text-2xl font-black text-slate-800 leading-none">{stats.filledCount}</div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered</div>
-                  </div>
-                  <div className="w-px h-8 bg-slate-200" />
-                  <div className="text-right">
-                      <div className="text-2xl font-black text-slate-300 leading-none">{stats.totalEvents}</div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Events</div>
-                  </div>
+              <div className="text-right">
+                  <div className="text-3xl font-black text-red-600 leading-none">-{penalties.total}</div>
+                  <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Total Deduction</div>
               </div>
           </div>
         </DialogHeader>
+
+        {/* Penalty Summary Section */}
+        <div className="grid grid-cols-2 gap-4 p-4 bg-white border-b shrink-0">
+            <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-100 rounded-full text-orange-600">
+                        <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <div className="text-xs font-bold text-orange-700 uppercase tracking-wider">Non-Compliant</div>
+                        <div className="text-sm text-orange-600/80">{penalties.nonCompliantCount} Students</div>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <div className="text-xl font-bold text-orange-700">-{penalties.compliance}</div>
+                    <div className="text-[10px] text-orange-500 font-medium">pts</div>
+                </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-100 rounded-full text-red-600">
+                        <UserMinus className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <div className="text-xs font-bold text-red-700 uppercase tracking-wider">Absent Events</div>
+                        <div className="text-sm text-red-600/80">{penalties.absentCount} Events</div>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <div className="text-xl font-bold text-red-700">-{penalties.attendance}</div>
+                    <div className="text-[10px] text-red-500 font-medium">pts</div>
+                </div>
+            </div>
+        </div>
 
         {/* Content Layout */}
         <div className="flex-1 flex flex-col min-h-0">
@@ -119,12 +254,12 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
             {/* Tabs Bar */}
             <div className="bg-white border-b px-6 pt-2 shrink-0">
                  <Tabs value={activeSection} onValueChange={setActiveSection} className="w-full">
-                    <TabsList className="w-full justify-start h-auto p-0 bg-transparent rounded-none gap-6 flex-wrap">
+                    <TabsList className="w-full justify-start h-auto p-0 bg-transparent rounded-none gap-4 flex-wrap">
                         {SECTIONS.map(sec => (
                             <TabsTrigger
                                 key={sec}
                                 value={sec}
-                                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary px-0 py-3 text-sm font-medium text-slate-500 hover:text-slate-800 transition-all"
+                                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary px-2 py-3 text-xs md:text-sm font-medium text-slate-500 hover:text-slate-800 transition-all"
                             >
                                 {sec}
                             </TabsTrigger>
@@ -133,7 +268,7 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
                  </Tabs>
             </div>
 
-            {/* Scrollable Content - Using native overflow-y-auto for reliable scrolling */}
+            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto bg-slate-50/50">
                 <div className="p-6 space-y-8 pb-20">
 
@@ -146,7 +281,6 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
                         {/* ON STAGE SECTION */}
                         {stats.onStage.length > 0 && (
                             <section>
-                                {/* Sticky Header */}
                                 <div className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm py-2 mb-2 border-b border-purple-100 flex items-center gap-2 shadow-sm">
                                     <span className="p-1.5 rounded-md bg-purple-100 text-purple-600">
                                         <Mic2 className="w-4 h-4" />
@@ -166,7 +300,6 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
                         {/* OFF STAGE SECTION */}
                         {stats.offStage.length > 0 && (
                             <section>
-                                {/* Sticky Header */}
                                 <div className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm py-2 mb-2 border-b border-indigo-100 flex items-center gap-2 shadow-sm">
                                     <span className="p-1.5 rounded-md bg-indigo-100 text-indigo-600">
                                         <LayoutGrid className="w-4 h-4" />
@@ -199,7 +332,7 @@ export function TeamDetailsDialog({ team, open, onOpenChange }: { team: Team | n
   )
 }
 
-function EventStatusCard({ event }: { event: any }) {
+function EventStatusCard({ event }: { event: EventStatus }) {
     const isFull = event.status === 'FULL'
     const isEmpty = event.status === 'EMPTY'
 
@@ -210,7 +343,6 @@ function EventStatusCard({ event }: { event: any }) {
             isEmpty ? "bg-slate-50/80 border-slate-200 hover:bg-white hover:border-slate-300 hover:shadow-sm" :
             "bg-white border-orange-200 shadow-sm"
         )}>
-            {/* Header: Title and Status Icon */}
             <div className="flex justify-between items-start gap-3 mb-3">
                 <h4 className={cn("font-semibold text-sm leading-snug wrap-break-word", isEmpty ? "text-slate-600" : "text-slate-900")}>
                     {event.name}
@@ -219,7 +351,6 @@ function EventStatusCard({ event }: { event: any }) {
                 {!isFull && !isEmpty && <div className="w-2 h-2 rounded-full bg-orange-400 shrink-0 mt-1.5" />}
             </div>
 
-            {/* Footer: Capacity and Registered Count */}
             <div className="mt-auto flex items-end justify-between pt-2 border-t border-dashed border-slate-100/50">
                 <Badge variant="outline" className="text-[10px] border-slate-200 text-slate-400 font-normal h-5 px-1.5 bg-slate-50/50">
                     Max: {event.max_participants_per_team}
