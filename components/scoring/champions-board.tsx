@@ -129,7 +129,7 @@ export function ChampionsBoard({ refreshTrigger }: { refreshTrigger: number }) {
                     <div className="grid grid-cols-2 divide-x divide-white/10">
                         {/* KALA */}
                         <div className="p-3 relative group">
-                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-linear-to-br from-yellow-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             <div className="flex flex-col h-full relative z-10">
                                 <div className="flex items-center gap-1.5 mb-1.5">
                                     <Crown className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400/20" />
@@ -147,7 +147,7 @@ export function ChampionsBoard({ refreshTrigger }: { refreshTrigger: number }) {
 
                         {/* SARGGA */}
                         <div className="p-3 relative group">
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute inset-0 bg-linear-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                              <div className="flex flex-col h-full relative z-10">
                                 <div className="flex items-center gap-1.5 mb-1.5">
                                     <Star className="w-3.5 h-3.5 text-blue-400 fill-blue-400/20" />

@@ -96,7 +96,7 @@ export function LiveLeaderboard({ refreshTrigger }: { refreshTrigger: number }) 
                   <TableRow className="border-border/50 hover:bg-transparent h-8">
                     <TableHead className="w-[50px] pl-4 text-[10px] font-bold uppercase tracking-wider h-8">Rank</TableHead>
                     <TableHead className="min-w-[140px] sticky left-0 z-10 bg-slate-50 text-[10px] font-bold uppercase tracking-wider h-8 border-r border-border/50">Team Name</TableHead>
-                    <TableHead className="text-center w-[80px] bg-primary/5 text-primary font-black text-[10px] uppercase tracking-wider h-8 border-x border-primary/10">Total</TableHead>
+                    <TableHead className="text-center w-20 bg-primary/5 text-primary font-black text-[10px] uppercase tracking-wider h-8 border-x border-primary/10">Total</TableHead>
                     <TableHead className="text-center w-[60px] text-[10px] text-muted-foreground h-8">Senior</TableHead>
                     <TableHead className="text-center w-[60px] text-[10px] text-muted-foreground h-8">Junior</TableHead>
                     <TableHead className="text-center w-[60px] text-[10px] text-muted-foreground h-8">Sub-Jr</TableHead>
