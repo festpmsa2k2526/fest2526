@@ -13,6 +13,7 @@ import {
   Music,
   Trophy,
   IdCardLanyard,
+  Replace,
   LogOut,
   ScrollText,
   Menu,
@@ -40,6 +41,7 @@ function NavContent({ role, setOpen }: { role: string, setOpen?: (open: boolean)
     { href: "/admin/students", label: "Students", icon: Users },
     { href: "/admin/events", label: "Events", icon: Music },
     { href: "/admin/scoring", label: "Scoring", icon: Trophy },
+    { href: "/admin/replacement", label: "Replacement", icon: Replace },
     { href: "/admin/reports", label: "Reports", icon: ScrollText },
   ] : [
     { href: "/captain", label: "Dashboard", icon: LayoutDashboard },
