@@ -12,8 +12,8 @@ import {
   Users,
   Music,
   Trophy,
+  IdCardLanyard,
   LogOut,
-  CheckCircle,
   ScrollText,
   Menu,
   Palette
@@ -44,7 +44,8 @@ function NavContent({ role, setOpen }: { role: string, setOpen?: (open: boolean)
   ] : [
     { href: "/captain", label: "Dashboard", icon: LayoutDashboard },
     { href: "/captain/events", label: "Register Events", icon: Music },
-    { href: "/captain/participations", label: "My Team", icon: CheckCircle },
+    { href: "/captain/participations", label: "Admit Card", icon: IdCardLanyard },
+    { href: "/captain/status", label: "Reports", icon:  ScrollText},
   ]
 
   return (
