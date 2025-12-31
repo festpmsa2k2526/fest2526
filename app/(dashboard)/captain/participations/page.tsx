@@ -56,10 +56,14 @@ export default function CaptainParticipations() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
 
+  // New State for Header Image
+  const [headerImageUrl, setHeaderImageUrl] = useState<string | null>(null)
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+
   const supabase = createClient()
 
-  // Fetch Data
-  async function loadParticipations() {
+  // Fetch Data & Assets
+  async function loadData() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -73,6 +77,7 @@ export default function CaptainParticipations() {
       const profile = profileData as unknown as Profile
       if (!profile?.team_id) return
 
+      // 1. Fetch Participations
       const { data: participations, error } = await supabase
         .from('participations')
         .select(`
@@ -91,8 +96,18 @@ export default function CaptainParticipations() {
       setRawData(rows)
       processGroupedData(rows)
 
+      // 2. Fetch Header Image Asset
+      const { data: assetData } = await (supabase.from('site_assets') as any)
+        .select('value')
+        .eq('key', 'admit_card_header')
+        .single()
+
+      if (assetData) {
+        setHeaderImageUrl(assetData.value)
+      }
+
     } catch (err) {
-      console.error("Error fetching participations:", err)
+      console.error("Error fetching data:", err)
     } finally {
       setLoading(false)
     }
@@ -122,7 +137,7 @@ export default function CaptainParticipations() {
   }
 
   useEffect(() => {
-    loadParticipations()
+    loadData()
   }, [])
 
   // --- FILTERING ---
@@ -136,90 +151,176 @@ export default function CaptainParticipations() {
     })
   }, [groupedData, searchQuery])
 
+  // --- PDF GENERATOR HELPER: Convert URL to Base64 ---
+  const getDataUri = async (url: string): Promise<string> => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.error("Error fetching image:", e);
+        return "";
+    }
+  }
+
   // --- PDF GENERATOR LOGIC ---
-  const generatePDF = (itemsToPrint: GroupedParticipant[]) => {
+  const generatePDF = async (itemsToPrint: GroupedParticipant[]) => {
     if (itemsToPrint.length === 0) return alert("No data to print")
 
-    const doc = new jsPDF()
-    let isFirstPage = true
+    setIsGeneratingPdf(true)
 
-    itemsToPrint.forEach((item) => {
-        if (!isFirstPage) doc.addPage()
-        isFirstPage = false
-        doc.addImage("/header-bg.png", "PNG", 0, 0, 210, 40)
-        // Header
-        doc.setFontSize(22)
-        doc.setFont("helvetica", "bold")
-        doc.text("ARTS FEST 2025", 105, 20, { align: "center" })
-        doc.setFontSize(12)
-        doc.setFont("helvetica", "normal")
-        doc.text(`Admit Card - ${item.category}`, 105, 28, { align: "center" }) // Show Category in Header
+    try {
+        const doc = new jsPDF()
+        let headerBase64 = ""
 
-        // Separator
-        doc.setLineWidth(0.5)
-        doc.line(10, 35, 200, 35)
+        // Fetch Header Image if available
+        if (headerImageUrl) {
+            headerBase64 = await getDataUri(headerImageUrl)
+        }
 
-        // Student Details
-        autoTable(doc, {
-            startY: 40,
-            body: [
-                ["Name", item.student.name],
-                ["Chest No", item.student.chest_no || "N/A"],
-                ["Class & Section", `${item.student.class_grade || '-'} (${item.student.section})`],
-            ],
-            theme: 'plain',
-            styles: { fontSize: 11, cellPadding: 1.5 },
-            columnStyles: {
-                0: { fontStyle: 'bold', cellWidth: 40 },
-                1: { cellWidth: 'auto' }
+        let isFirstPage = true
+
+        itemsToPrint.forEach((item, index) => {
+            if (!isFirstPage) doc.addPage()
+            isFirstPage = false
+
+            // 1. Header Image (Top Banner)
+            // A4 width is 210mm. We use full width. Height ~35mm.
+            if (headerBase64) {
+                doc.addImage(headerBase64, "PNG", 0, 0, 210, 35)
+            } else {
+                // Fallback Header if no image
+                doc.setFillColor(40, 40, 40)
+                doc.rect(0, 0, 210, 35, "F")
+                doc.setTextColor(255, 255, 255)
+                doc.setFontSize(20)
+                doc.setFont("helvetica", "bold")
+                doc.text("ARTS FEST 2025", 105, 20, { align: "center" })
             }
+
+            // 2. Title Section
+            doc.setTextColor(0, 0, 0)
+            doc.setFont("helvetica", "bold")
+            doc.setFontSize(16)
+            doc.text("ADMIT CARD", 105, 48, { align: "center" })
+
+            // Category Subtitle
+            doc.setFontSize(11)
+            doc.setTextColor(100, 100, 100)
+            doc.setFont("helvetica", "normal")
+            doc.text(`CATEGORY: ${item.category}`, 105, 54, { align: "center" })
+
+            // Draw line under title
+            doc.setDrawColor(200, 200, 200)
+            doc.line(70, 58, 140, 58)
+
+            // 3. Student Details (Grid Layout)
+            const startY = 65
+            const col1 = 20
+            const col2 = 110
+
+            doc.setFontSize(10)
+            doc.setTextColor(50, 50, 50)
+
+            // Name
+            doc.setFont("helvetica", "bold")
+            doc.text("NAME:", col1, startY)
+            doc.setFont("helvetica", "normal")
+            doc.text(item.student.name.toUpperCase(), col1 + 25, startY)
+
+            // Chest No (Prominent)
+            doc.setFont("helvetica", "bold")
+            doc.text("CHEST NO:", col2, startY)
+            doc.setFont("helvetica", "bold")
+            doc.setFontSize(12)
+            doc.text(item.student.chest_no || "N/A", col2 + 25, startY)
+
+            // Second Row
+            const row2Y = startY + 8
+            doc.setFontSize(10)
+
+            doc.setFont("helvetica", "bold")
+            doc.text("SECTION:", col1, row2Y)
+            doc.setFont("helvetica", "normal")
+            doc.text(item.student.section, col1 + 25, row2Y)
+
+            doc.setFont("helvetica", "bold")
+            doc.text("CLASS:", col2, row2Y)
+            doc.setFont("helvetica", "normal")
+            doc.text(item.student.class_grade || "-", col2 + 25, row2Y)
+
+            // 4. Events Table
+            // @ts-ignore
+            autoTable(doc, {
+                startY: 85,
+                head: [["#", "Code", "Event Name", "Invigilator Sign"]],
+                body: item.events.map((e, i) => [
+                    i + 1,
+                    e.event_code || "-",
+                    e.name,
+                    ""
+                ]),
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [30, 30, 30],
+                    textColor: 255,
+                    fontSize: 10,
+                    fontStyle: 'bold',
+                    halign: 'center'
+                },
+                columnStyles: {
+                    0: { cellWidth: 15, halign: 'center' },
+                    1: { cellWidth: 30, halign: 'center' },
+                    2: { cellWidth: 'auto' },
+                    3: { cellWidth: 40 }
+                },
+                styles: {
+                    fontSize: 10,
+                    cellPadding: 4,
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.1
+                },
+                alternateRowStyles: {
+                    fillColor: [250, 250, 250]
+                }
+            })
+
+            // 5. Footer Watermark & Timestamp
+            const pageHeight = doc.internal.pageSize.height
+            const now = new Date().toLocaleString('en-IN', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: true
+            })
+
+            doc.setFontSize(8)
+            doc.setTextColor(150, 150, 150)
+            doc.setFont("helvetica", "italic")
+
+            // Left: Timestamp
+            doc.text(`Printed: ${now}`, 15, pageHeight - 10)
+
+            // Center: Watermark
+            doc.text("Generated by Arts Fest System", 105, pageHeight - 10, { align: "center" })
+
+            // Right: Page count (optional, but nice)
+            doc.text(`Page ${index + 1} of ${itemsToPrint.length}`, 195, pageHeight - 10, { align: "right" })
         })
 
-        // Separator
-        // @ts-ignore
-        const finalY = doc.lastAutoTable.finalY + 5
-        doc.line(10, finalY, 200, finalY)
-
-        // Events Table (Only for this category)
-        doc.setFontSize(14)
-        doc.setFont("helvetica", "bold")
-        doc.text(`Events (${item.category})`, 14, finalY + 10)
-
-        const tableBody = item.events.map((e, index) => [
-            index + 1,
-            e.event_code || "-",
-            e.name,
-            "" // Signature
-        ])
-
-        autoTable(doc, {
-            startY: finalY + 15,
-            head: [["Sl No", "Code", "Event Name", "Signature"]],
-            body: tableBody,
-            theme: 'grid',
-            headStyles: { fillColor: [40, 40, 40], textColor: 255 },
-            columnStyles: {
-                0: { cellWidth: 15, halign: 'center' },
-                1: { cellWidth: 25, halign: 'center' },
-                2: { cellWidth: 'auto' },
-                3: { cellWidth: 40 }
-            },
-            styles: { minCellHeight: 12, valign: 'middle' }
-        })
-
-        // Footer
-        const pageHeight = doc.internal.pageSize.height
-        doc.setFontSize(8)
-        doc.setFont("helvetica", "italic")
-        doc.text("Generated by Arts Fest System", 105, pageHeight - 10, { align: "center" })
-    })
-
-    doc.save(`admit_cards_${new Date().toISOString().slice(0,10)}.pdf`)
+        doc.save(`AdmitCards_${new Date().toISOString().slice(0,10)}.pdf`)
+    } catch (e) {
+        console.error("PDF Generation failed", e)
+        alert("Failed to generate PDF. Please try again.")
+    } finally {
+        setIsGeneratingPdf(false)
+    }
   }
 
   // Bulk Print Handler
   const handleBulkPrint = (category: string) => {
-    // Filter currently viewable list by category
     const listToPrint = filteredData.filter(item => item.category === category)
     if (listToPrint.length === 0) {
         alert(`No participants found for ${category} in the current view.`)
@@ -242,9 +343,9 @@ export default function CaptainParticipations() {
         <div className="flex flex-wrap gap-2">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2">
-                        <Printer className="w-4 h-4" />
-                        Print All
+                    <Button variant="outline" className="gap-2" disabled={isGeneratingPdf}>
+                        {isGeneratingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                        {isGeneratingPdf ? "Generating..." : "Print All"}
                         <ChevronDown className="w-3 h-3 opacity-50" />
                     </Button>
                 </DropdownMenuTrigger>
@@ -341,6 +442,7 @@ export default function CaptainParticipations() {
                                 size="sm"
                                 className="h-8 gap-2 text-xs"
                                 onClick={() => generatePDF([row])}
+                                disabled={isGeneratingPdf}
                             >
                                 <FileDown className="w-3 h-3" /> Download
                             </Button>
