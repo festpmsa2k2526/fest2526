@@ -104,8 +104,8 @@ export function AddEditTransactionModal({
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-white">
-                                <SelectItem value="CREDIT" className="text-emerald-600">CREDIT (Incoming)</SelectItem>
-                                <SelectItem value="DEBIT" className="text-red-600">DEBIT (Outgoing)</SelectItem>
+                                <SelectItem value="CREDIT" className="text-emerald-600">CREDIT</SelectItem>
+                                <SelectItem value="DEBIT" className="text-red-600">DEBIT</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

@@ -316,7 +316,7 @@ export default function FinancePage() {
             </Button>
 
             {/* Action Group */}
-            <div className="flex bg-white rounded-md border shadow-sm p-0.5">
+            <div className="flex bg-white rounded-md border ">
                 <Button
                     variant="ghost"
                     size="icon"
