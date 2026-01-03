@@ -6,7 +6,20 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Loader2, Upload, Link as LinkIcon, Save, Image as ImageIcon, ExternalLink, CheckCircle2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import {
+  Loader2,
+  Upload,
+  Link as LinkIcon,
+  Save,
+  Image as ImageIcon,
+  ExternalLink,
+  CheckCircle2,
+  AlertTriangle,
+  FileText,
+  Settings2,
+  XCircle
+} from "lucide-react"
 import { toast } from "sonner"
 
 interface SiteAsset {
@@ -23,6 +36,9 @@ export default function AssetsManagePage() {
   const [updatingLink, setUpdatingLink] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
 
+  // New state for inline error message
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -32,8 +48,7 @@ export default function AssetsManagePage() {
       try {
         setLoading(true)
 
-        // FIX: Cast the entire query builder chain to 'any'
-        // This bypasses the table check completely
+        // Using 'as any' to bypass strict table typing if types aren't generated yet
         const { data, error } = await (supabase.from('site_assets') as any)
           .select('*')
           .in('key', ['rulebook_link', 'admit_card_header'])
@@ -65,7 +80,6 @@ export default function AssetsManagePage() {
     try {
       setUpdatingLink(true)
 
-      // FIX: Cast the query builder to 'any' before calling .update()
       const { error } = await (supabase.from('site_assets') as any)
         .update({ value: handbookLink, updated_at: new Date().toISOString() })
         .eq('key', 'rulebook_link')
@@ -84,22 +98,30 @@ export default function AssetsManagePage() {
   // 3. Image Upload Handler
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    setUploadError(null) // Reset error state on new selection
+
     if (!file) return
 
-    // Basic Validation
+    // A. Validation: File Type
     if (!file.type.startsWith('image/')) {
-        toast.error("Please select a valid image file")
+        const msg = "Invalid file type. Please upload an image (PNG, JPG)."
+        setUploadError(msg)
+        toast.error(msg)
         return
     }
-    if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        toast.error("Image size must be less than 2MB")
+
+    // B. Validation: File Size (2MB Limit)
+    if (file.size > 2 * 1024 * 1024) {
+        const msg = `File is too large (${(file.size / (1024*1024)).toFixed(2)}MB). Max size is 2MB.`
+        setUploadError(msg)
+        toast.error(msg)
         return
     }
 
     try {
         setUploadingImage(true)
 
-        // A. Upload to Supabase Storage
+        // Upload to Supabase Storage
         const fileExt = file.name.split('.').pop()
         const fileName = `admit-header-${Date.now()}.${fileExt}`
         const filePath = `${fileName}`
@@ -110,25 +132,25 @@ export default function AssetsManagePage() {
 
         if (uploadError) throw uploadError
 
-        // B. Get Public URL
+        // Get Public URL
         const { data: { publicUrl } } = supabase.storage
             .from('site-assets')
             .getPublicUrl(filePath)
 
-        // C. Update Database Record
-        // FIX: Cast the query builder to 'any' before calling .update()
+        // Update Database Record
         const { error: dbError } = await (supabase.from('site_assets') as any)
             .update({ value: publicUrl, updated_at: new Date().toISOString() })
             .eq('key', 'admit_card_header')
 
         if (dbError) throw dbError
 
-        // D. Update Local State
+        // Update Local State
         setHeaderImageUrl(publicUrl)
         toast.success("Header image uploaded successfully")
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Upload failed:", error)
+        setUploadError(error.message || "Failed to upload image")
         toast.error("Failed to upload image")
     } finally {
         setUploadingImage(false)
@@ -138,128 +160,160 @@ export default function AssetsManagePage() {
 
   if (loading) return (
     <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+        <Loader2 className="animate-spin text-primary w-10 h-10" />
     </div>
   )
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50/50 p-4 md:p-8 space-y-8">
+    <div className="min-h-screen bg-slate-50/50 p-6 md:p-10 space-y-8 animate-in fade-in duration-500">
 
-      {/* Header Section */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Assets Management</h1>
-        <p className="text-slate-500 mt-2 max-w-2xl">
-          Manage dynamic resources for the event portal. Updates made here reflect immediately on the student and captain dashboards.
-        </p>
+      {/* Page Header */}
+      <div className="flex items-center gap-3 border-b border-slate-200 pb-6">
+        <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
+          <Settings2 className="w-8 h-8 text-slate-700" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Assets Management</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Configure global resources for the Captain's Portal and Admit Cards.
+          </p>
+        </div>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-2 max-w-5xl">
+      <div className="grid gap-8 lg:grid-cols-2 max-w-6xl mx-auto">
 
-        {/* --- CARD 1: HANDBOOK LINK --- */}
-        <Card className="border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="bg-white border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+        {/* --- CARD 1: HANDBOOK CONFIGURATION --- */}
+        <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden bg-white">
+            <CardHeader className="bg-linear-to-r from-blue-50 to-white border-b border-blue-100/50 pb-6">
+                <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-100 rounded-lg text-blue-600 shadow-sm ring-1 ring-blue-200">
                         <LinkIcon className="w-5 h-5" />
                     </div>
-                    <CardTitle className="text-lg">Event Handbook</CardTitle>
+                    <div>
+                        <CardTitle className="text-lg font-semibold text-slate-800">Event Handbook</CardTitle>
+                        <CardDescription className="text-slate-500 mt-1">
+                            Set the Google Drive or PDF link for the Captain's rulebook.
+                        </CardDescription>
+                    </div>
                 </div>
-                <CardDescription>
-                    The Google Drive or PDF link accessed by Captains.
-                </CardDescription>
             </CardHeader>
-            <CardContent className="pt-6 space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="handbook-url">Drive Link URL</Label>
-                    <div className="flex gap-2">
+            <CardContent className="pt-8 space-y-6">
+                <div className="space-y-3">
+                    <Label htmlFor="handbook-url" className="text-slate-700 font-medium">External Drive Link</Label>
+                    <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FileText className="h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                        </div>
                         <Input
                             id="handbook-url"
-                            placeholder="https://drive.google.com/file/d/..."
+                            placeholder="https://drive.google.com/..."
                             value={handbookLink}
                             onChange={(e) => setHandbookLink(e.target.value)}
-                            className="font-mono text-sm bg-slate-50 focus:bg-white transition-colors"
+                            className="pl-10 font-mono text-sm bg-slate-50 focus:bg-white border-slate-200 focus:border-blue-400 focus:ring-blue-100 h-11 transition-all"
                         />
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+                        <span>Must be a publicly accessible URL.</span>
                         {handbookLink && (
-                             <Button
-                                variant="outline"
-                                size="icon"
-                                type="button"
-                                onClick={() => window.open(handbookLink, '_blank')}
-                                title="Test Link"
-                             >
-                                <ExternalLink className="w-4 h-4" />
-                             </Button>
+                            <a
+                                href={handbookLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-1 text-blue-600 hover:underline cursor-pointer"
+                            >
+                                Test Link <ExternalLink className="w-3 h-3" />
+                            </a>
                         )}
                     </div>
                 </div>
             </CardContent>
-            <CardFooter className="bg-slate-50/50 border-t border-slate-100 flex justify-end py-3">
+            <CardFooter className="bg-slate-50 border-t border-slate-100 py-4 px-6 flex justify-end">
                 <Button
                     onClick={handleUpdateLink}
                     disabled={updatingLink || !handbookLink}
-                    className="w-full md:w-auto"
+                    className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white shadow-sm"
                 >
                     {updatingLink ? (
-                        <>
-                           <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...
-                        </>
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
                     ) : (
-                        <>
-                           <Save className="w-4 h-4 mr-2" /> Save Changes
-                        </>
+                        <><Save className="w-4 h-4 mr-2" /> Save Changes</>
                     )}
                 </Button>
             </CardFooter>
         </Card>
 
         {/* --- CARD 2: ADMIT CARD HEADER --- */}
-        <Card className="border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <CardHeader className="bg-white border-b border-slate-100 pb-4">
-                 <div className="flex items-center gap-2 mb-1">
-                    <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
+        <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden bg-white flex flex-col">
+            <CardHeader className="bg-linear-to-r from-purple-50 to-white border-b border-purple-100/50 pb-6">
+                 <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-purple-100 rounded-lg text-purple-600 shadow-sm ring-1 ring-purple-200">
                         <ImageIcon className="w-5 h-5" />
                     </div>
-                    <CardTitle className="text-lg">Admit Card Header</CardTitle>
+                    <div>
+                        <CardTitle className="text-lg font-semibold text-slate-800">Admit Card Header</CardTitle>
+                        <CardDescription className="text-slate-500 mt-1">
+                            Banner image displayed at the top of generated PDFs.
+                        </CardDescription>
+                    </div>
                 </div>
-                <CardDescription>
-                    This image appears at the top of every generated PDF admit card.
-                </CardDescription>
             </CardHeader>
-            <CardContent className="pt-6 flex-1 flex flex-col gap-6">
+            <CardContent className="pt-8 flex-1 flex flex-col gap-6">
 
-                {/* Image Preview Area */}
-                <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 flex flex-col items-center justify-center min-h-40 relative overflow-hidden group">
-                    {uploadingImage && (
-                        <div className="absolute inset-0 z-20 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                            <div className="flex flex-col items-center gap-2">
-                                <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-                                <span className="text-sm font-medium text-purple-600">Uploading...</span>
-                            </div>
-                        </div>
-                    )}
+                {/* Visual Preview Container */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <Label className="text-slate-700 font-medium">Current Banner</Label>
+                        <Badge variant="outline" className="text-xs font-normal text-slate-500 bg-slate-50">
+                            Recommended: 2000x350px
+                        </Badge>
+                    </div>
 
-                    {headerImageUrl ? (
-                        <div className="relative w-full">
-                            <img
-                                src={headerImageUrl}
-                                alt="Current Header"
-                                className="w-full h-auto max-h-[200px] object-contain rounded-md shadow-sm"
-                            />
-                            <div className="absolute top-2 right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Active
+                    <div className="relative rounded-xl border border-slate-200 bg-slate-100/50 p-2 min-h-40 flex items-center justify-center overflow-hidden group hover:border-purple-200 transition-colors">
+
+                        {/* Loading Overlay */}
+                        {uploadingImage && (
+                            <div className="absolute inset-0 z-30 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center gap-3 animate-in fade-in">
+                                <Loader2 className="w-10 h-10 text-purple-600 animate-spin" />
+                                <span className="text-sm font-medium text-slate-600">Uploading new asset...</span>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="text-center text-slate-400">
-                            <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No image set</p>
-                        </div>
-                    )}
+                        )}
+
+                        {/* Image or Placeholder */}
+                        {headerImageUrl ? (
+                            <div className="relative w-full h-full flex items-center justify-center bg-[url('/grid-pattern.svg')]">
+                                <img
+                                    src={headerImageUrl}
+                                    alt="Current Header"
+                                    className="w-full h-auto max-h-[180px] object-contain rounded-lg shadow-sm"
+                                />
+                                <div className="absolute top-3 right-3 bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 border border-emerald-400">
+                                    <CheckCircle2 className="w-3 h-3" /> LIVE
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center text-slate-400 py-8">
+                                <div className="p-4 bg-slate-50 rounded-full mb-3 border border-slate-200">
+                                    <ImageIcon className="w-8 h-8 opacity-40" />
+                                </div>
+                                <p className="text-sm font-medium">No banner image set</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Upload Controls */}
-                <div className="space-y-2">
-                     <Label>Upload New Header</Label>
+                {/* Error Alert Box */}
+                {uploadError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3 animate-in slide-in-from-top-2">
+                        <XCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-sm font-semibold text-red-800">Upload Failed</p>
+                            <p className="text-xs text-red-600 mt-1">{uploadError}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Upload Action Area */}
+                <div className="mt-auto">
                      <input
                         type="file"
                         accept="image/*"
@@ -270,17 +324,20 @@ export default function AssetsManagePage() {
                      />
                      <Button
                         variant="outline"
-                        className="w-full h-12 border-dashed border-slate-300 hover:border-purple-400 hover:bg-purple-50 text-slate-600 hover:text-purple-700 transition-all"
+                        className="w-full h-12 border-dashed border-2 border-slate-300 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-600 hover:text-purple-700 transition-all group"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadingImage}
                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        {uploadingImage ? "Uploading..." : "Click to Select Image"}
+                        <div className="flex flex-col items-center py-1">
+                            <div className="flex items-center gap-2">
+                                <Upload className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                <span className="font-semibold">Click to upload new banner</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-normal mt-0.5">
+                                Max size: 2MB • Formats: PNG, JPG
+                            </span>
+                        </div>
                      </Button>
-                     <p className="text-xs text-slate-400 text-center">
-                        Recommended: PNG or JPG, max 2MB.
-                        <br/>Aspect ratio should be wide (e.g. 1000x200px).
-                     </p>
                 </div>
             </CardContent>
         </Card>

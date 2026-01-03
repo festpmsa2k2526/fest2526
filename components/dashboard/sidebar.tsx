@@ -18,6 +18,7 @@ import {
   Files,
   ScrollText,
   Menu,
+  IndianRupee,
   Palette
 } from "lucide-react"
 
@@ -44,6 +45,7 @@ function NavContent({ role, setOpen }: { role: string, setOpen?: (open: boolean)
     { href: "/admin/scoring", label: "Scoring", icon: Trophy },
     { href: "/admin/replacement", label: "Replacement", icon: Replace },
     { href: "/admin/reports", label: "Reports", icon: ScrollText },
+    { href: "/admin/payment", label: "Financial", icon: IndianRupee },
     { href: "/admin/assets", label: "Assets Manage", icon: Files },
   ] : [
     { href: "/captain", label: "Dashboard", icon: LayoutDashboard },
